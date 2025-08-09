@@ -1,37 +1,78 @@
 *,
 *::before,
-*::after { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  padding-bottom: var(--strip-h);
+  margin: 0;
+}
 
 :root {
-  --bg: #faf8f5;
-  --ink: #101010;
-  --muted-ink: #5a5a5a;
+  --bg: #0f1114;
+  --ink: #e8e3d7;
+  --accent: #c7a066;
+  --accent-2: #2a2d33;
+  --strip-h: 112px;
 }
 
 body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: var(--bg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  background: radial-gradient(
+    1200px 600px at 50% 20%,
+    #15181d 0%,
+    var(--bg) 55%
+  );
   color: var(--ink);
   line-height: 1.4;
 }
 
 .hero {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 6vh 4vw 12vh;
-  text-align: center;
+  min-height: calc(100vh - var(--strip-h));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1vh 4vw 6vh;
   gap: 2rem;
+  text-align: center;
 }
 
 .hero h1 {
-  font-family: "Poiret One", "Josefin Sans", system-ui, sans-serif;
+  font-family: "Poiret One", system-ui, sans-serif;
   font-weight: 400;
-  font-size: clamp(2.8rem, 6vw, 6rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0;
+  position: relative;
+  padding-block: 0.7rem;
+}
+
+.hero h1::before,
+.hero h1::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: min(72vw, 820px);
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--accent) 20%,
+    var(--accent) 80%,
+    transparent
+  );
+  transform: translateX(-50%);
+}
+.hero h1::before {
+  top: 0;
+}
+.hero h1::after {
+  bottom: 0;
 }
 
 .hero-image {
@@ -44,23 +85,77 @@ body {
   width: auto;
   height: auto;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 8px;
+  outline: 1px solid var(--accent-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 #bottom-strip {
-  position: fixed;
-  inset: auto 0 0 0;
-  height: 96px; 
+  height: var(--strip-h);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 70%);
+  display: block;
   overflow: hidden;
   pointer-events: none;
-  display: none;
-  background: linear-gradient(to top, rgba(0,0,0,0.06), transparent 70%);
-  border-top: 1px solid rgba(0,0,0,0.08);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+#bottom-strip::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(var(--accent-2), var(--accent-2)) top/100% 1px
+      no-repeat,
+    linear-gradient(var(--accent), var(--accent)) top/100% 3px no-repeat;
+  pointer-events: none;
+}
+
+.teeth-marquee {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 32' shape-rendering='crispEdges'>\
+<rect width='48' height='32' fill='none'/>\
+<!-- outline -->\
+<rect x='10' y='4' width='28' height='1' fill='%23231f1a'/>\
+<rect x='9'  y='5' width='1'  height='12' fill='%23231f1a'/>\
+<rect x='38' y='5' width='1'  height='12' fill='%23231f1a'/>\
+<rect x='10' y='17' width='8' height='1' fill='%23231f1a'/>\
+<rect x='30' y='17' width='8' height='1' fill='%23231f1a'/>\
+<rect x='14' y='18' width='1' height='10' fill='%23231f1a'/>\
+<rect x='33' y='18' width='1' height='10' fill='%23231f1a'/>\
+<!-- tooth body -->\
+<rect x='10' y='5' width='28' height='12' fill='%23e8e3d7'/>\
+<rect x='14' y='18' width='8' height='10' fill='%23e8e3d7'/>\
+<rect x='26' y='18' width='8' height='10' fill='%23e8e3d7'/>\
+<!-- deco gold cap -->\
+<rect x='10' y='7' width='28' height='1' fill='%23c7a066'/>\
+</svg>");
+  background-repeat: repeat-x;
+  background-size: 64px 32px; /* 48 tile + 16 gap */
+  background-position: 0 70%;
+  image-rendering: pixelated;
+  animation: teeth-scroll 2.7s linear infinite;
+  opacity: 0.9;
+  z-index: 0; /* below the top lines */
+}
+
+/* Scroll animation */
+@keyframes teeth-scroll {
+  to {
+    background-position-x: -64px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reduce-motion {
-    animation: none !important;
-    transition: none !important;
+  .teeth-marquee {
+    animation-duration: 0.001ms;
+    animation-iteration-count: 1;
   }
 }
