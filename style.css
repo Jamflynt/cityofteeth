@@ -92,7 +92,6 @@ body {
 
 #bottom-strip {
   height: var(--strip-h);
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 70%);
   display: block;
   overflow: hidden;
   pointer-events: none;
@@ -114,48 +113,13 @@ body {
       no-repeat,
     linear-gradient(var(--accent), var(--accent)) top/100% 3px no-repeat;
   pointer-events: none;
+  z-index: 2;
 }
 
-.teeth-marquee {
+#parade-canvas {
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 32' shape-rendering='crispEdges'>\
-<rect width='48' height='32' fill='none'/>\
-<!-- outline -->\
-<rect x='10' y='4' width='28' height='1' fill='%23231f1a'/>\
-<rect x='9'  y='5' width='1'  height='12' fill='%23231f1a'/>\
-<rect x='38' y='5' width='1'  height='12' fill='%23231f1a'/>\
-<rect x='10' y='17' width='8' height='1' fill='%23231f1a'/>\
-<rect x='30' y='17' width='8' height='1' fill='%23231f1a'/>\
-<rect x='14' y='18' width='1' height='10' fill='%23231f1a'/>\
-<rect x='33' y='18' width='1' height='10' fill='%23231f1a'/>\
-<!-- tooth body -->\
-<rect x='10' y='5' width='28' height='12' fill='%23e8e3d7'/>\
-<rect x='14' y='18' width='8' height='10' fill='%23e8e3d7'/>\
-<rect x='26' y='18' width='8' height='10' fill='%23e8e3d7'/>\
-<!-- deco gold cap -->\
-<rect x='10' y='7' width='28' height='1' fill='%23c7a066'/>\
-</svg>");
-  background-repeat: repeat-x;
-  background-size: 64px 32px; /* 48 tile + 16 gap */
-  background-position: 0 70%;
-  image-rendering: pixelated;
-  animation: teeth-scroll 2.7s linear infinite;
-  opacity: 0.9;
-  z-index: 0; /* below the top lines */
-}
-
-/* Scroll animation */
-@keyframes teeth-scroll {
-  to {
-    background-position-x: -64px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .teeth-marquee {
-    animation-duration: 0.001ms;
-    animation-iteration-count: 1;
-  }
+  width: 100%;
+  height: 100%;
+  z-index: 0;
 }
