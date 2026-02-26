@@ -8,15 +8,39 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="./style.css?v=20260225" />
+  <link rel="stylesheet" href="./style.css?v=20260226" />
 </head>
 <body>
+  <!-- splash / enter page -->
+  <div id="splash-overlay" aria-label="Welcome screen">
+    <div class="splash-content">
+      <p class="splash-subtitle">Welcome to the</p>
+      <h1 class="splash-title">City of Teeth</h1>
+      <div class="splash-tooth-art" aria-hidden="true">
+        <svg viewBox="0 0 80 96" width="80" height="96">
+          <path d="M12 6 L68 6 Q76 6 76 14 L76 48 Q76 56 68 56 L56 56 L62 84 Q64 92 52 92 L46 92 Q42 92 40 84 L36 56 L28 56 L24 84 Q22 92 14 92 Q6 92 10 84 L16 56 L12 56 Q4 56 4 48 L4 14 Q4 6 12 6Z" fill="#e8e3d7" stroke="#231f1a" stroke-width="2"/>
+          <rect x="12" y="24" width="56" height="5" rx="2" fill="#c7a066"/>
+          <circle cx="30" cy="36" r="4" fill="#231f1a"/>
+          <circle cx="50" cy="36" r="4" fill="#231f1a"/>
+          <path d="M30 46 Q40 56 50 46" stroke="#231f1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <button class="splash-enter" type="button">Enter</button>
+    </div>
+  </div>
+
   <canvas id="bg-canvas" aria-hidden="true"></canvas>
+  <canvas id="spawn-canvas" aria-hidden="true"></canvas>
 
   <main class="hero">
     <h1>
       <span class="letter" style="--i:0">C</span><span class="letter" style="--i:1">i</span><span class="letter" style="--i:2">t</span><span class="letter" style="--i:3">y</span><span class="letter space" style="--i:4">&nbsp;</span><span class="letter" style="--i:5">o</span><span class="letter" style="--i:6">f</span><span class="letter space" style="--i:7">&nbsp;</span><span class="letter" style="--i:8">T</span><span class="letter" style="--i:9">e</span><span class="letter" style="--i:10">e</span><span class="letter" style="--i:11">t</span><span class="letter" style="--i:12">h</span>
     </h1>
+
+    <div class="visitor-counter" aria-label="Visitor counter">
+      <span class="visitor-counter-label">visitor no.</span>
+      <span class="visitor-counter-number">000001</span>
+    </div>
 
     <figure class="hero-image">
       <img src="./images/CityOfTeethIntro.png" alt="City of Teeth" />
@@ -29,6 +53,16 @@
     <canvas id="parade-canvas" aria-hidden="true"></canvas>
   </div>
 
-  <script src="./script.js?v=20260225" defer></script>
+  <!-- custom context menu -->
+  <div id="context-menu" class="context-menu" role="menu" aria-hidden="true">
+    <button class="context-item" role="menuitem" data-action="brush">&#9733; Brush this tooth</button>
+    <button class="context-item" role="menuitem" data-action="extract">&#10007; Extract</button>
+    <button class="context-item" role="menuitem" data-action="floss">&#8764; Floss</button>
+    <hr class="context-divider" />
+    <button class="context-item" role="menuitem" data-action="appointment">&#9783; Schedule Appointment</button>
+    <button class="context-item" role="menuitem" data-action="fairy">&#10024; Call the Tooth Fairy</button>
+  </div>
+
+  <script src="./script.js?v=20260226" defer></script>
 </body>
 </html>
