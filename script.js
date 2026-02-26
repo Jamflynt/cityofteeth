@@ -2179,13 +2179,21 @@
     var strip = document.getElementById("bottom-strip");
     if (strip) strip.style.display = "block";
 
-    // visitor counter (always increment, even before entering)
-    var count = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
-    if (isNaN(count)) count = 0;
-    count++;
-    localStorage.setItem("cityOfTeethCounter", count);
+    // visitor counter (shared via CountAPI)
     var counterEl = document.querySelector(".visitor-counter-number");
-    if (counterEl) counterEl.textContent = pad(count);
+    fetch("https://countapi.mileshilliard.com/api/v1/hit/cityofteeth-visitors")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (counterEl) counterEl.textContent = pad(parseInt(data.value, 10));
+      })
+      .catch(function () {
+        // fallback to localStorage if API is unreachable
+        var fallback = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
+        if (isNaN(fallback)) fallback = 0;
+        fallback++;
+        localStorage.setItem("cityOfTeethCounter", fallback);
+        if (counterEl) counterEl.textContent = pad(fallback);
+      });
 
     // splash gate — animations start after entering
     initSplash(function startSite() {
