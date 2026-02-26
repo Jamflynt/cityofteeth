@@ -57,6 +57,7 @@
   let reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)"
   ).matches;
+  var isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
   function initCanvas() {
     canvas = document.getElementById("parade-canvas");
@@ -99,44 +100,45 @@
   ];
   const EXPRESSIONS = ["happy", "silly", "excited", "singing", "wink", "cool"];
 
-  function drawTooth(tooth, t) {
+  function drawTooth(tooth, t, targetCtx) {
+    const c = targetCtx || ctx;
     const { x, y, scale, type, accessory, danceStyle, expression, phase, flipX } = tooth;
 
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(scale * (flipX ? -1 : 1), scale);
+    c.save();
+    c.translate(x, y);
+    c.scale(scale * (flipX ? -1 : 1), scale);
 
     // dance transform
     const danceOffset = getDanceTransform(danceStyle, t, phase);
-    ctx.translate(danceOffset.tx, danceOffset.ty);
-    ctx.rotate(danceOffset.rot);
+    c.translate(danceOffset.tx, danceOffset.ty);
+    c.rotate(danceOffset.rot);
 
     // base tooth size reference
     const bw = 30; // body width
     const bh = 22; // body height
 
     // draw shadow
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.beginPath();
-    ctx.ellipse(0, bh * 0.6 + 8, bw * 0.45, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    c.fillStyle = "rgba(0,0,0,0.18)";
+    c.beginPath();
+    c.ellipse(0, bh * 0.6 + 8, bw * 0.45, 4, 0, 0, Math.PI * 2);
+    c.fill();
 
     // draw legs (behind body)
-    drawLegs(ctx, bw, bh, danceStyle, t, phase);
+    drawLegs(c, bw, bh, danceStyle, t, phase);
 
     // draw tooth body
-    drawToothBody(ctx, type, bw, bh);
+    drawToothBody(c, type, bw, bh);
 
     // draw arms
-    drawArms(ctx, bw, bh, danceStyle, t, phase, accessory);
+    drawArms(c, bw, bh, danceStyle, t, phase, accessory);
 
     // draw face
-    drawFace(ctx, expression, bw, bh, t, phase);
+    drawFace(c, expression, bw, bh, t, phase);
 
     // draw accessory
-    drawAccessory(ctx, accessory, bw, bh, t, phase);
+    drawAccessory(c, accessory, bw, bh, t, phase);
 
-    ctx.restore();
+    c.restore();
   }
 
   function getDanceTransform(style, t, phase) {
@@ -1798,7 +1800,7 @@
   }
 
   function initMouseTrail() {
-    if (reducedMotion) return;
+    if (reducedMotion || isTouchDevice) return;
 
     createCursor();
 
@@ -1849,64 +1851,397 @@
     }, 1500);
   }
 
+  /* ── splash / enter page ────────────────────────────── */
+  function initSplash(onEnter) {
+    if (sessionStorage.getItem("cityOfTeethEntered")) {
+      const overlay = document.getElementById("splash-overlay");
+      if (overlay) overlay.classList.add("hidden");
+      onEnter();
+      return;
+    }
+
+    const overlay = document.getElementById("splash-overlay");
+    const enterBtn = overlay && overlay.querySelector(".splash-enter");
+    if (!overlay || !enterBtn) {
+      onEnter();
+      return;
+    }
+
+    enterBtn.addEventListener("click", function () {
+      sessionStorage.setItem("cityOfTeethEntered", "1");
+      overlay.classList.add("exiting");
+      overlay.addEventListener("transitionend", function () {
+        overlay.classList.add("hidden");
+      }, { once: true });
+      setTimeout(function () { overlay.classList.add("hidden"); }, 1000);
+      onEnter();
+    });
+  }
+
+  /* ── click-to-spawn teeth ──────────────────────────── */
+  var spawnCanvas, spawnCtx, spawnW, spawnH;
+  var spawnedTeeth = [];
+  var spawnAnimId = null;
+  var spawnTime = 0;
+  var spawnLastTime = 0;
+
+  function initSpawnCanvas() {
+    spawnCanvas = document.getElementById("spawn-canvas");
+    if (!spawnCanvas) return false;
+    spawnCtx = spawnCanvas.getContext("2d");
+    resizeSpawn();
+    return true;
+  }
+
+  function resizeSpawn() {
+    if (!spawnCanvas) return;
+    spawnW = window.innerWidth;
+    spawnH = window.innerHeight;
+    spawnCanvas.width = spawnW * DPR;
+    spawnCanvas.height = spawnH * DPR;
+    spawnCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  var SPAWN_GRAVITY = 500;
+  var SPAWN_BOUNCE = 0.5;
+
+  function spawnToothAt(cx, cy) {
+    spawnedTeeth.push({
+      x: cx,
+      y: cy,
+      vx: rand(-60, 60),
+      vy: rand(-250, -80),
+      scale: rand(0.8, 1.4),
+      type: pick(TOOTH_TYPES),
+      accessory: pick(ACCESSORIES),
+      danceStyle: pick(DANCE_STYLES),
+      expression: pick(EXPRESSIONS),
+      phase: rand(0, Math.PI * 2),
+      flipX: Math.random() > 0.5,
+      life: 0,
+      maxLife: rand(3, 5),
+      rotation: 0,
+      rotSpeed: rand(-3, 3),
+      grounded: false,
+      bounces: 0,
+    });
+
+    if (!spawnAnimId && !reducedMotion) {
+      spawnLastTime = 0;
+      spawnAnimId = requestAnimationFrame(spawnLoop);
+    }
+  }
+
+  function spawnLoop(timestamp) {
+    if (!spawnLastTime) spawnLastTime = timestamp;
+    var dt = Math.min((timestamp - spawnLastTime) / 1000, 0.05);
+    spawnLastTime = timestamp;
+    spawnTime += dt;
+
+    var groundY = spawnH * 0.85;
+
+    for (var i = spawnedTeeth.length - 1; i >= 0; i--) {
+      var st = spawnedTeeth[i];
+      st.life += dt;
+
+      if (!st.grounded) {
+        st.vy += SPAWN_GRAVITY * dt;
+        st.x += st.vx * dt;
+        st.y += st.vy * dt;
+        st.rotation += st.rotSpeed * dt;
+
+        if (st.y >= groundY) {
+          st.y = groundY;
+          st.vy *= -SPAWN_BOUNCE;
+          st.vx *= 0.7;
+          st.rotSpeed *= 0.5;
+          st.bounces++;
+          if (Math.abs(st.vy) < 20 || st.bounces > 3) {
+            st.grounded = true;
+            st.vy = 0;
+            st.vx = 0;
+            st.rotSpeed = 0;
+          }
+        }
+      }
+
+      if (st.life > st.maxLife) {
+        spawnedTeeth.splice(i, 1);
+      }
+    }
+
+    spawnCtx.clearRect(0, 0, spawnW, spawnH);
+    for (var j = 0; j < spawnedTeeth.length; j++) {
+      var tooth = spawnedTeeth[j];
+      var fadeStart = tooth.maxLife - 1;
+      var alpha = tooth.life > fadeStart
+        ? Math.max(0, 1 - (tooth.life - fadeStart))
+        : 1;
+
+      spawnCtx.save();
+      spawnCtx.globalAlpha = alpha;
+      spawnCtx.translate(tooth.x, tooth.y);
+      spawnCtx.rotate(tooth.rotation);
+      drawTooth({ x: 0, y: 0, scale: tooth.scale, type: tooth.type,
+        accessory: tooth.accessory, danceStyle: tooth.danceStyle,
+        expression: tooth.expression, phase: tooth.phase, flipX: tooth.flipX
+      }, spawnTime, spawnCtx);
+      spawnCtx.restore();
+    }
+
+    if (spawnedTeeth.length > 0) {
+      spawnAnimId = requestAnimationFrame(spawnLoop);
+    } else {
+      spawnAnimId = null;
+      spawnCtx.clearRect(0, 0, spawnW, spawnH);
+    }
+  }
+
+  function initClickToSpawn() {
+    if (reducedMotion) return;
+    if (!initSpawnCanvas()) return;
+
+    function shouldIgnore(target) {
+      return target.closest("button, a, .context-menu, #splash-overlay");
+    }
+
+    document.addEventListener("click", function (e) {
+      if (shouldIgnore(e.target)) return;
+      spawnToothAt(e.clientX, e.clientY);
+    });
+
+    if (isTouchDevice) {
+      document.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
+        if (shouldIgnore(e.target)) return;
+        var touch = e.touches[0];
+        spawnToothAt(touch.clientX, touch.clientY);
+      }, { passive: true });
+    }
+  }
+
+  /* ── custom context menu ───────────────────────────── */
+  function initContextMenu() {
+    var menu = document.getElementById("context-menu");
+    if (!menu) return;
+
+    function showMenu(x, y) {
+      menu.classList.add("visible");
+      menu.setAttribute("aria-hidden", "false");
+
+      var rect = menu.getBoundingClientRect();
+      if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+      if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+      if (x < 0) x = 8;
+      if (y < 0) y = 8;
+
+      menu.style.left = x + "px";
+      menu.style.top = y + "px";
+    }
+
+    function hideMenu() {
+      menu.classList.remove("visible");
+      menu.setAttribute("aria-hidden", "true");
+    }
+
+    document.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+      showMenu(e.clientX, e.clientY);
+    });
+
+    // long-press for touch devices
+    if (isTouchDevice) {
+      var longPressTimer = null;
+      var longPressX = 0;
+      var longPressY = 0;
+
+      document.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
+        if (e.target.closest(".context-menu")) return;
+        longPressX = e.touches[0].clientX;
+        longPressY = e.touches[0].clientY;
+        longPressTimer = setTimeout(function () {
+          showMenu(longPressX, longPressY);
+        }, 500);
+      }, { passive: true });
+
+      document.addEventListener("touchmove", function () {
+        clearTimeout(longPressTimer);
+      }, { passive: true });
+
+      document.addEventListener("touchend", function () {
+        clearTimeout(longPressTimer);
+      }, { passive: true });
+    }
+
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest(".context-menu")) {
+        hideMenu();
+      }
+    });
+
+    document.addEventListener("touchstart", function (e) {
+      if (!e.target.closest(".context-menu") && menu.classList.contains("visible")) {
+        hideMenu();
+      }
+    }, { passive: true });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        hideMenu();
+      }
+    });
+
+    menu.addEventListener("click", function (e) {
+      var item = e.target.closest(".context-item");
+      if (!item) return;
+
+      var action = item.dataset.action;
+      var mx = parseInt(menu.style.left, 10);
+      var my = parseInt(menu.style.top, 10);
+
+      switch (action) {
+        case "brush":
+          ctxMenuSparkles(mx, my, 12);
+          break;
+        case "extract":
+          document.body.style.animation = "extractShake 0.3s ease";
+          setTimeout(function () { document.body.style.animation = ""; }, 350);
+          break;
+        case "floss":
+          ctxMenuFloss(my);
+          break;
+        case "appointment":
+          ctxMenuMessage("See you next Tuesday!", mx, my);
+          break;
+        case "fairy":
+          for (var i = 0; i < 20; i++) {
+            (function (idx) {
+              setTimeout(function () {
+                ctxMenuSparkles(rand(0, window.innerWidth), rand(-20, 0), 3);
+              }, idx * 50);
+            })(i);
+          }
+          break;
+      }
+
+      menu.classList.remove("visible");
+      menu.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function ctxMenuSparkles(x, y, count) {
+    var trail = document.getElementById("mouse-trail");
+    if (!trail) return;
+    for (var i = 0; i < count; i++) {
+      var el = document.createElement("div");
+      el.className = "trail-sparkle";
+      var size = rand(4, 10);
+      var color = pick(["#c7a066", "#dbb777", "#e8e3d7", "#d4838a"]);
+      el.style.left = (x + rand(-30, 30)) + "px";
+      el.style.top = (y + rand(-30, 30)) + "px";
+      el.style.width = size + "px";
+      el.style.height = size + "px";
+      el.style.borderRadius = "50%";
+      el.style.background = color;
+      trail.appendChild(el);
+      (function (elem) {
+        setTimeout(function () { elem.remove(); }, 600);
+      })(el);
+    }
+  }
+
+  function ctxMenuMessage(text, x, y) {
+    var msg = document.createElement("div");
+    msg.textContent = text;
+    msg.style.cssText =
+      "position:fixed;left:" + x + "px;top:" + (y - 30) + "px;" +
+      "color:#c7a066;font-family:'Poiret One',sans-serif;" +
+      "font-size:0.9rem;pointer-events:none;z-index:15001;" +
+      "animation:msgFloat 1.5s ease-out forwards;";
+    document.body.appendChild(msg);
+    setTimeout(function () { msg.remove(); }, 1600);
+  }
+
+  function ctxMenuFloss(y) {
+    var el = document.createElement("div");
+    el.style.cssText =
+      "position:fixed;left:-10%;top:" + y + "px;width:120%;" +
+      "height:2px;background:linear-gradient(to right,transparent,#c7a066,transparent);" +
+      "z-index:15001;pointer-events:none;" +
+      "animation:flossSlide 0.6s ease-in-out forwards;";
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 700);
+  }
+
   /* ── init ─────────────────────────────────────────────── */
-  document.addEventListener("DOMContentLoaded", () => {
-    const strip = document.getElementById("bottom-strip");
+  document.addEventListener("DOMContentLoaded", function () {
+    var strip = document.getElementById("bottom-strip");
     if (strip) strip.style.display = "block";
 
     // visitor counter (shared via CountAPI)
-    const counterEl = document.querySelector(".visitor-counter-number");
+    var counterEl = document.querySelector(".visitor-counter-number");
     fetch("https://countapi.mileshilliard.com/api/v1/hit/cityofteeth-visitors")
-      .then((res) => res.json())
-      .then((data) => {
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
         if (counterEl) counterEl.textContent = pad(parseInt(data.value, 10));
       })
-      .catch(() => {
+      .catch(function () {
         // fallback to localStorage if API is unreachable
-        let fallback = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
+        var fallback = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
         if (isNaN(fallback)) fallback = 0;
         fallback++;
         localStorage.setItem("cityOfTeethCounter", fallback);
         if (counterEl) counterEl.textContent = pad(fallback);
       });
 
-    // init parade animation (bottom strip)
-    if (initCanvas()) {
-      initParade();
-      if (reducedMotion) {
-        animTime = 1;
-        draw();
-      } else {
-        requestAnimationFrame(loop);
+    // splash gate — animations start after entering
+    initSplash(function startSite() {
+      // parade animation (bottom strip)
+      if (initCanvas()) {
+        initParade();
+        if (reducedMotion) {
+          animTime = 1;
+          draw();
+        } else {
+          requestAnimationFrame(loop);
+        }
       }
-    }
 
-    // init background animation
-    if (initBgCanvas()) {
-      initBgScene();
-      if (reducedMotion) {
-        bgTime = 1;
-        drawBg();
-      } else {
-        requestAnimationFrame(bgLoop);
+      // background animation
+      if (initBgCanvas()) {
+        initBgScene();
+        if (reducedMotion) {
+          bgTime = 1;
+          drawBg();
+        } else {
+          requestAnimationFrame(bgLoop);
+        }
       }
-    }
 
-    // mouse trail + custom cursor
-    initMouseTrail();
+      // mouse trail + custom cursor
+      initMouseTrail();
 
-    // title shimmer
-    initTitleShimmer();
+      // title shimmer
+      initTitleShimmer();
+
+      // click-to-spawn teeth
+      initClickToSpawn();
+
+      // custom context menu
+      initContextMenu();
+    });
 
     // handle resize
-    let resizeTimer;
-    window.addEventListener("resize", () => {
+    var resizeTimer;
+    window.addEventListener("resize", function () {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
+      resizeTimer = setTimeout(function () {
         resize();
         initParade();
         resizeBg();
         initBgScene();
+        resizeSpawn();
       }, 150);
     });
   });
@@ -1914,7 +2249,7 @@
   // respect dynamic preference changes
   window
     .matchMedia("(prefers-reduced-motion: reduce)")
-    .addEventListener("change", (e) => {
+    .addEventListener("change", function (e) {
       reducedMotion = e.matches;
       if (!reducedMotion) {
         lastTime = 0;
