@@ -1854,13 +1854,21 @@
     const strip = document.getElementById("bottom-strip");
     if (strip) strip.style.display = "block";
 
-    // visitor counter
-    let count = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
-    if (isNaN(count)) count = 0;
-    count++;
-    localStorage.setItem("cityOfTeethCounter", count);
+    // visitor counter (shared via CountAPI)
     const counterEl = document.querySelector(".visitor-counter-number");
-    if (counterEl) counterEl.textContent = pad(count);
+    fetch("https://countapi.mileshilliard.com/api/v1/hit/cityofteeth-visitors")
+      .then((res) => res.json())
+      .then((data) => {
+        if (counterEl) counterEl.textContent = pad(parseInt(data.value, 10));
+      })
+      .catch(() => {
+        // fallback to localStorage if API is unreachable
+        let fallback = parseInt(localStorage.getItem("cityOfTeethCounter"), 10);
+        if (isNaN(fallback)) fallback = 0;
+        fallback++;
+        localStorage.setItem("cityOfTeethCounter", fallback);
+        if (counterEl) counterEl.textContent = pad(fallback);
+      });
 
     // init parade animation (bottom strip)
     if (initCanvas()) {
