@@ -1355,6 +1355,500 @@
     }
   }
 
+  /* ═══════════════════════════════════════════════════════
+     BACKGROUND CANVAS — stars, clouds, skyline, floating teeth
+     ═══════════════════════════════════════════════════════ */
+  let bgCanvas, bgCtx, bgW, bgH;
+  let bgStars = [];
+  let bgClouds = [];
+  let bgFloaters = []; // mini teeth floating up
+  let bgTime = 0;
+  let bgLastTime = 0;
+
+  function initBgCanvas() {
+    bgCanvas = document.getElementById("bg-canvas");
+    if (!bgCanvas) return false;
+    bgCtx = bgCanvas.getContext("2d");
+    resizeBg();
+    return true;
+  }
+
+  function resizeBg() {
+    bgW = window.innerWidth;
+    bgH = window.innerHeight;
+    bgCanvas.width = bgW * DPR;
+    bgCanvas.height = bgH * DPR;
+    bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  /* ── stars ─────────────────────────────────────────────── */
+  class Star {
+    constructor() {
+      this.x = rand(0, bgW);
+      this.y = rand(0, bgH * 0.6);
+      this.size = rand(0.5, 2.5);
+      this.twinkleSpeed = rand(1, 4);
+      this.twinklePhase = rand(0, Math.PI * 2);
+      this.baseAlpha = rand(0.2, 0.7);
+      this.color = pick(["#e8e3d7", "#dbb777", "#c7a066", "#ffffff", "#7eaac4"]);
+    }
+    draw(ctx, t) {
+      const twinkle = (Math.sin(t * this.twinkleSpeed + this.twinklePhase) + 1) / 2;
+      const alpha = this.baseAlpha * (0.3 + twinkle * 0.7);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = this.color;
+
+      if (this.size > 1.8) {
+        // bigger stars get a cross shape
+        const s = this.size;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y - s);
+        ctx.lineTo(this.x + s * 0.2, this.y - s * 0.2);
+        ctx.lineTo(this.x + s, this.y);
+        ctx.lineTo(this.x + s * 0.2, this.y + s * 0.2);
+        ctx.lineTo(this.x, this.y + s);
+        ctx.lineTo(this.x - s * 0.2, this.y + s * 0.2);
+        ctx.lineTo(this.x - s, this.y);
+        ctx.lineTo(this.x - s * 0.2, this.y - s * 0.2);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ── pen-sketch clouds (inspired by the illustration) ── */
+  class Cloud {
+    constructor(initial) {
+      this.reset(initial);
+    }
+    reset(initial) {
+      this.x = initial ? rand(-200, bgW + 200) : bgW + rand(50, 300);
+      this.y = rand(bgH * 0.05, bgH * 0.35);
+      this.speed = rand(5, 15);
+      this.scale = rand(0.6, 1.4);
+      this.opacity = rand(0.04, 0.12);
+      this.segments = randInt(3, 6);
+      this.bumps = [];
+      for (let i = 0; i < this.segments; i++) {
+        this.bumps.push({
+          rx: rand(20, 45) * this.scale,
+          ry: rand(12, 25) * this.scale,
+          ox: (i - this.segments / 2) * rand(25, 35) * this.scale,
+          oy: rand(-5, 5) * this.scale,
+        });
+      }
+      // crosshatch lines (pen-and-ink style)
+      this.hatchCount = randInt(4, 10);
+      this.hatchAngle = rand(-0.3, 0.3);
+    }
+    update(dt) {
+      this.x -= this.speed * dt;
+      if (this.x + this.segments * 50 * this.scale < -100) {
+        this.reset(false);
+      }
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.globalAlpha = this.opacity;
+
+      // cloud body (overlapping ellipses)
+      ctx.fillStyle = "#e8e3d7";
+      for (const b of this.bumps) {
+        ctx.beginPath();
+        ctx.ellipse(b.ox, b.oy, b.rx, b.ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // crosshatch lines for pen-sketch feel
+      ctx.strokeStyle = "rgba(199,160,102,0.3)";
+      ctx.lineWidth = 0.5;
+      ctx.rotate(this.hatchAngle);
+      const totalW = this.segments * 35 * this.scale;
+      for (let i = 0; i < this.hatchCount; i++) {
+        const frac = i / this.hatchCount;
+        const hy = -15 * this.scale + frac * 30 * this.scale;
+        ctx.beginPath();
+        ctx.moveTo(-totalW * 0.4, hy);
+        ctx.lineTo(totalW * 0.4, hy);
+        ctx.stroke();
+      }
+
+      // outline strokes (sketchy)
+      ctx.strokeStyle = "rgba(35,31,26,0.15)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]);
+      for (const b of this.bumps) {
+        ctx.beginPath();
+        ctx.ellipse(b.ox, b.oy, b.rx, b.ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
+  /* ── floating mini-teeth (rise from bottom) ────────── */
+  class FloatingTooth {
+    constructor() {
+      this.reset(true);
+    }
+    reset(initial) {
+      this.x = rand(0, bgW);
+      this.y = initial ? rand(bgH * 0.3, bgH) : bgH + rand(10, 40);
+      this.size = rand(4, 10);
+      this.speedY = rand(8, 20);
+      this.drift = rand(-8, 8);
+      this.wobble = rand(2, 6);
+      this.wobbleSpeed = rand(1, 3);
+      this.phase = rand(0, Math.PI * 2);
+      this.rot = rand(-0.3, 0.3);
+      this.rotSpeed = rand(-1, 1);
+      this.opacity = rand(0.08, 0.2);
+      this.color = pick(["#e8e3d7", "#cec9bc", "#dbb777", "#c7a066"]);
+    }
+    update(dt) {
+      this.y -= this.speedY * dt;
+      this.x += this.drift * dt + Math.sin(this.phase) * this.wobble * dt;
+      this.phase += this.wobbleSpeed * dt;
+      this.rot += this.rotSpeed * dt;
+      if (this.y < -20) this.reset(false);
+    }
+    draw(ctx) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rot);
+      ctx.globalAlpha = this.opacity;
+      const s = this.size;
+
+      // simple tooth silhouette
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.moveTo(-s, -s * 0.6);
+      ctx.lineTo(s, -s * 0.6);
+      ctx.quadraticCurveTo(s + s * 0.1, 0, s * 0.5, s * 0.5);
+      ctx.lineTo(s * 0.2, s);
+      ctx.lineTo(0, s * 0.6);
+      ctx.lineTo(-s * 0.2, s);
+      ctx.lineTo(-s * 0.5, s * 0.5);
+      ctx.quadraticCurveTo(-s - s * 0.1, 0, -s, -s * 0.6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
+  /* ── skyline silhouette ────────────────────────────────── */
+  function drawSkyline(ctx, w, h, t) {
+    const baseY = h * 0.88;
+    ctx.save();
+
+    // distant glow
+    const glowGrd = ctx.createRadialGradient(w * 0.5, baseY, 0, w * 0.5, baseY, w * 0.5);
+    glowGrd.addColorStop(0, "rgba(199,160,102,0.04)");
+    glowGrd.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glowGrd;
+    ctx.fillRect(0, baseY - h * 0.2, w, h * 0.3);
+
+    // buildings
+    ctx.fillStyle = "rgba(15,17,20,0.6)";
+    const buildings = [
+      { x: 0.02, w: 0.04, h: 0.08 },
+      { x: 0.07, w: 0.03, h: 0.12 },
+      { x: 0.11, w: 0.05, h: 0.06 },
+      { x: 0.17, w: 0.025, h: 0.15 },
+      { x: 0.20, w: 0.04, h: 0.09 },
+      { x: 0.25, w: 0.03, h: 0.18 },
+      { x: 0.29, w: 0.05, h: 0.07 },
+      { x: 0.35, w: 0.02, h: 0.22 }, // tall tower
+      { x: 0.38, w: 0.06, h: 0.1 },
+      { x: 0.45, w: 0.04, h: 0.14 },
+      { x: 0.50, w: 0.03, h: 0.2 },
+      { x: 0.54, w: 0.05, h: 0.08 },
+      { x: 0.60, w: 0.025, h: 0.16 },
+      { x: 0.63, w: 0.04, h: 0.11 },
+      { x: 0.68, w: 0.03, h: 0.19 },
+      { x: 0.72, w: 0.06, h: 0.07 },
+      { x: 0.79, w: 0.025, h: 0.13 },
+      { x: 0.82, w: 0.04, h: 0.09 },
+      { x: 0.87, w: 0.03, h: 0.17 },
+      { x: 0.91, w: 0.05, h: 0.06 },
+      { x: 0.97, w: 0.03, h: 0.11 },
+    ];
+
+    for (const b of buildings) {
+      const bx = b.x * w;
+      const bw = b.w * w;
+      const bh = b.h * h;
+      ctx.fillRect(bx, baseY - bh, bw, bh);
+    }
+
+    // bridge (inspired by the Covington bridge in the image)
+    ctx.strokeStyle = "rgba(35,31,26,0.3)";
+    ctx.lineWidth = 2;
+    // main bridge deck
+    ctx.beginPath();
+    ctx.moveTo(0, baseY - h * 0.04);
+    ctx.lineTo(w, baseY - h * 0.04);
+    ctx.stroke();
+    // support cables (suspension style)
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(35,31,26,0.15)";
+    const towerX1 = w * 0.3;
+    const towerX2 = w * 0.7;
+    const towerTop = baseY - h * 0.25;
+    // towers
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(35,31,26,0.25)";
+    ctx.beginPath();
+    ctx.moveTo(towerX1, baseY);
+    ctx.lineTo(towerX1, towerTop);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(towerX2, baseY);
+    ctx.lineTo(towerX2, towerTop);
+    ctx.stroke();
+    // cables
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = "rgba(35,31,26,0.12)";
+    for (let i = 0; i < 12; i++) {
+      const frac = i / 11;
+      const cx = towerX1 + frac * (towerX2 - towerX1);
+      const sag = Math.sin(frac * Math.PI) * h * 0.12;
+      // cable from tower1
+      if (frac < 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(towerX1, towerTop);
+        ctx.lineTo(cx, baseY - h * 0.04 - sag * 0.3);
+        ctx.stroke();
+      }
+      // cable from tower2
+      if (frac > 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(towerX2, towerTop);
+        ctx.lineTo(cx, baseY - h * 0.04 - sag * 0.3);
+        ctx.stroke();
+      }
+    }
+    // main catenary
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(35,31,26,0.18)";
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const frac = i / 40;
+      const cx = towerX1 + frac * (towerX2 - towerX1);
+      const sag = Math.sin(frac * Math.PI) * h * 0.15;
+      const cy = towerTop + sag;
+      if (i === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+
+    // twinkling windows
+    for (const b of buildings) {
+      const bx = b.x * w;
+      const bw = b.w * w;
+      const bh = b.h * h;
+      const cols = Math.max(1, Math.floor(bw / 6));
+      const rows = Math.max(1, Math.floor(bh / 8));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const hash = (b.x * 1000 + r * 13 + c * 7) % 1;
+          if (hash > 0.4) continue; // only some windows lit
+          const flicker = (Math.sin(t * (1.5 + hash * 3) + hash * 100) + 1) / 2;
+          const wx = bx + 3 + c * ((bw - 6) / Math.max(cols - 1, 1));
+          const wy = baseY - bh + 4 + r * ((bh - 8) / Math.max(rows - 1, 1));
+          ctx.fillStyle = `rgba(219,183,119,${0.15 + flicker * 0.35})`;
+          ctx.fillRect(wx, wy, 2, 2.5);
+        }
+      }
+    }
+
+    // ground fade
+    const groundGrd = ctx.createLinearGradient(0, baseY - 5, 0, h);
+    groundGrd.addColorStop(0, "rgba(15,17,20,0)");
+    groundGrd.addColorStop(0.5, "rgba(15,17,20,0.7)");
+    groundGrd.addColorStop(1, "rgba(15,17,20,1)");
+    ctx.fillStyle = groundGrd;
+    ctx.fillRect(0, baseY - 5, w, h - baseY + 5);
+
+    ctx.restore();
+  }
+
+  /* ── background draw/update ───────────────────────────── */
+  function initBgScene() {
+    bgStars = [];
+    bgClouds = [];
+    bgFloaters = [];
+
+    const starCount = Math.min(Math.floor((bgW * bgH) / 4000), 200);
+    for (let i = 0; i < starCount; i++) bgStars.push(new Star());
+
+    const cloudCount = Math.min(Math.floor(bgW / 250), 6);
+    for (let i = 0; i < cloudCount; i++) bgClouds.push(new Cloud(true));
+
+    const floaterCount = Math.min(Math.floor(bgW / 60), 25);
+    for (let i = 0; i < floaterCount; i++) bgFloaters.push(new FloatingTooth());
+  }
+
+  function updateBg(dt) {
+    bgTime += dt;
+    for (const c of bgClouds) c.update(dt);
+    for (const f of bgFloaters) f.update(dt);
+  }
+
+  function drawBg() {
+    bgCtx.clearRect(0, 0, bgW, bgH);
+
+    // background gradient (replaces the old CSS radial-gradient)
+    const bgGrd = bgCtx.createRadialGradient(
+      bgW * 0.5, bgH * 0.2, 0,
+      bgW * 0.5, bgH * 0.2, Math.max(bgW, bgH) * 0.7
+    );
+    bgGrd.addColorStop(0, "#15181d");
+    bgGrd.addColorStop(0.55, "#0f1114");
+    bgGrd.addColorStop(1, "#0f1114");
+    bgCtx.fillStyle = bgGrd;
+    bgCtx.fillRect(0, 0, bgW, bgH);
+
+    // stars
+    for (const s of bgStars) s.draw(bgCtx, bgTime);
+
+    // clouds
+    for (const c of bgClouds) c.draw(bgCtx);
+
+    // floating teeth
+    for (const f of bgFloaters) f.draw(bgCtx);
+
+    // skyline
+    drawSkyline(bgCtx, bgW, bgH, bgTime);
+  }
+
+  function bgLoop(timestamp) {
+    if (!bgLastTime) bgLastTime = timestamp;
+    const dt = Math.min((timestamp - bgLastTime) / 1000, 0.05);
+    bgLastTime = timestamp;
+
+    updateBg(dt);
+    drawBg();
+
+    if (!reducedMotion) requestAnimationFrame(bgLoop);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     CUSTOM CURSOR & MOUSE TRAIL
+     ═══════════════════════════════════════════════════════ */
+  let mouseX = -100, mouseY = -100;
+  let trailThrottle = 0;
+  let cursorEl = null;
+
+  function createCursor() {
+    cursorEl = document.createElement("div");
+    cursorEl.className = "custom-cursor";
+    cursorEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 28" width="24" height="28">
+      <path d="M4 2 L20 2 Q22 2 22 4 L22 14 Q22 16 20 16 L16 16 L18 24 Q18.5 26 16 26 L14 26 Q13 26 12.5 24 L10.5 16 L8 16 L6 24 Q5.5 26 4 26 L4 26 Q2 26 2.5 24 L4.5 16 L4 16 Q2 16 2 14 L2 4 Q2 2 4 2Z" fill="#e8e3d7" stroke="#231f1a" stroke-width="1.5"/>
+      <rect x="4" y="7" width="16" height="2" rx="1" fill="#c7a066"/>
+      <circle cx="9" cy="11" r="1.5" fill="#231f1a"/>
+      <circle cx="15" cy="11" r="1.5" fill="#231f1a"/>
+      <path d="M9 14 Q12 17 15 14" stroke="#231f1a" stroke-width="1" fill="none" stroke-linecap="round"/>
+    </svg>`;
+    document.body.appendChild(cursorEl);
+  }
+
+  function spawnTrailParticle(x, y) {
+    const trail = document.getElementById("mouse-trail");
+    if (!trail) return;
+
+    // mini tooth svg
+    if (Math.random() > 0.6) {
+      const el = document.createElement("div");
+      el.className = "trail-tooth";
+      const hue = pick(["#e8e3d7", "#dbb777", "#c7a066", "#d4838a"]);
+      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 14" width="12" height="14">
+        <path d="M2 1 L10 1 Q11 1 11 2 L11 8 Q11 9 10 9 L9 9 L9.5 12 Q10 13 8 13 L7 13 Q6 13 6 12 L5.5 9 L4 9 L3.5 12 Q3 13 2 13 Q1 13 1.5 12 L2 9 Q1 9 1 8 L1 2 Q1 1 2 1Z" fill="${hue}" stroke="#231f1a" stroke-width="0.8"/>
+      </svg>`;
+      el.style.left = (x + rand(-8, 8)) + "px";
+      el.style.top = (y + rand(-8, 8)) + "px";
+      trail.appendChild(el);
+      setTimeout(() => el.remove(), 800);
+    } else {
+      // sparkle dot
+      const el = document.createElement("div");
+      el.className = "trail-sparkle";
+      const size = rand(3, 7);
+      const color = pick(["#c7a066", "#dbb777", "#e8e3d7", "#d4838a", "#7eaac4"]);
+      el.style.left = (x + rand(-12, 12)) + "px";
+      el.style.top = (y + rand(-12, 12)) + "px";
+      el.style.width = size + "px";
+      el.style.height = size + "px";
+      el.style.borderRadius = "50%";
+      el.style.background = color;
+      trail.appendChild(el);
+      setTimeout(() => el.remove(), 600);
+    }
+  }
+
+  function initMouseTrail() {
+    if (reducedMotion) return;
+
+    createCursor();
+
+    document.addEventListener("mousemove", (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+
+      if (cursorEl) {
+        cursorEl.style.left = mouseX + "px";
+        cursorEl.style.top = mouseY + "px";
+      }
+
+      const now = Date.now();
+      if (now - trailThrottle > 60) {
+        trailThrottle = now;
+        spawnTrailParticle(mouseX, mouseY);
+      }
+    });
+
+    document.addEventListener("mouseleave", () => {
+      if (cursorEl) cursorEl.style.display = "none";
+    });
+    document.addEventListener("mouseenter", () => {
+      if (cursorEl) cursorEl.style.display = "";
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     TITLE SHIMMER EFFECT
+     ═══════════════════════════════════════════════════════ */
+  function initTitleShimmer() {
+    const letters = document.querySelectorAll(".letter");
+    let shimmerTime = 0;
+
+    function animateShimmer() {
+      shimmerTime += 0.005;
+      letters.forEach((el, i) => {
+        const offset = i * 25;
+        const pos = ((shimmerTime * 100 + offset) % 300);
+        el.style.backgroundPosition = `${pos}% 50%`;
+      });
+      if (!reducedMotion) requestAnimationFrame(animateShimmer);
+    }
+
+    // start shimmer after letters have appeared
+    setTimeout(() => {
+      if (!reducedMotion) requestAnimationFrame(animateShimmer);
+    }, 1500);
+  }
+
   /* ── init ─────────────────────────────────────────────── */
   document.addEventListener("DOMContentLoaded", () => {
     const strip = document.getElementById("bottom-strip");
@@ -1368,17 +1862,33 @@
     const counterEl = document.querySelector(".visitor-counter-number");
     if (counterEl) counterEl.textContent = pad(count);
 
-    // init parade animation
-    if (!initCanvas()) return;
-    initParade();
-
-    if (reducedMotion) {
-      // draw one static frame
-      animTime = 1;
-      draw();
-    } else {
-      requestAnimationFrame(loop);
+    // init parade animation (bottom strip)
+    if (initCanvas()) {
+      initParade();
+      if (reducedMotion) {
+        animTime = 1;
+        draw();
+      } else {
+        requestAnimationFrame(loop);
+      }
     }
+
+    // init background animation
+    if (initBgCanvas()) {
+      initBgScene();
+      if (reducedMotion) {
+        bgTime = 1;
+        drawBg();
+      } else {
+        requestAnimationFrame(bgLoop);
+      }
+    }
+
+    // mouse trail + custom cursor
+    initMouseTrail();
+
+    // title shimmer
+    initTitleShimmer();
 
     // handle resize
     let resizeTimer;
@@ -1387,6 +1897,8 @@
       resizeTimer = setTimeout(() => {
         resize();
         initParade();
+        resizeBg();
+        initBgScene();
       }, 150);
     });
   });
@@ -1398,7 +1910,9 @@
       reducedMotion = e.matches;
       if (!reducedMotion) {
         lastTime = 0;
+        bgLastTime = 0;
         requestAnimationFrame(loop);
+        requestAnimationFrame(bgLoop);
       }
     });
 })();

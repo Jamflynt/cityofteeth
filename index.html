@@ -11,13 +11,19 @@
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+  <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
   <main class="hero">
-    <h1>City of Teeth</h1>
+    <h1>
+      <span class="letter" style="--i:0">C</span><span class="letter" style="--i:1">i</span><span class="letter" style="--i:2">t</span><span class="letter" style="--i:3">y</span><span class="letter space" style="--i:4">&nbsp;</span><span class="letter" style="--i:5">o</span><span class="letter" style="--i:6">f</span><span class="letter space" style="--i:7">&nbsp;</span><span class="letter" style="--i:8">T</span><span class="letter" style="--i:9">e</span><span class="letter" style="--i:10">e</span><span class="letter" style="--i:11">t</span><span class="letter" style="--i:12">h</span>
+    </h1>
 
     <figure class="hero-image">
       <img src="./images/CityOfTeethIntro.png" alt="City of Teeth" />
     </figure>
   </main>
+
+  <div id="mouse-trail" aria-hidden="true"></div>
 
   <div id="bottom-strip">
     <canvas id="parade-canvas" aria-hidden="true"></canvas>
